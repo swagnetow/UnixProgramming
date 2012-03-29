@@ -20,7 +20,7 @@ int mod_file_reader(char* buffer, char** buffer_location, off_t offset, int leng
         return_value = 0;
     }
     else {
-        return_value = sprintf(buffer, "%i %i", (int)CURRENT_TIME.tv_sec, (int)CURRENT_TIME.tv_nsec/1000);
+        return_value = sprintf(buffer, "%d %d", (int)CURRENT_TIME.tv_sec, (int)CURRENT_TIME.tv_nsec/1000);
     }
 
     return(return_value);
