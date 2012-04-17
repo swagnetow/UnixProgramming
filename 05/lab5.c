@@ -8,17 +8,38 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+/*
+ * run as root
+ * write to /etc/udev/rules.d/42-myclock2.rules
+ * execvp to do $(udevadm control --reload)
+ * synchronization!
+ * read from udev file
+ *
+ */
+
+#define SIG_TEST 44
+
 void get_current_time(int);
+int set_timeout_delay(int);
+void receive_data(int, siginfo_t *, void *);
 void timeout();
 
 /* Global variable to set the timeout. */
 int done;
 
-int main() {
+int main(int argc, char** argv) {
     int i;
     int n;
     struct itimerval value;
     struct itimerval ovalue;
+    struct sigaction sig;
+
+    sig.sa_sigaction = receive_data;
+    sig.sa_flags = SA_SIGINFO;
+    sigaction(SIG_TEST, &sig, NULL);
+
+    printf("I AM ERROR.\n");
+    set_timeout_delay(atoi(argv[1]));
 
     /* Executes every second for 5 minutes. */
     for(i = 1; i <= 300; i++) {
@@ -114,6 +135,42 @@ void get_current_time(int num) {
     }
 
     close(clock_fd);
+}
+
+int set_timeout_delay(int delay) {
+    char buffer[32];
+    int delay_open;
+    int delay_write;
+    int delay_read;
+
+    delay_open = open("/sys/kernel/delay/delay", O_RDWR);
+
+    if(delay_open < 0) {
+        perror("Error opening delay file");
+        return -1;
+    }
+
+    sprintf(buffer, "%i", delay);
+
+    delay_write = write(delay_open, buffer, strlen(buffer) + 1);
+
+    if(delay_write < 0) {
+        perror("Error writing to delay file");
+        return -1;
+    }
+
+    delay_read = read(delay_open, &buffer[0], sizeof(buffer));
+
+    if(delay_read < 0) {
+        perror("Error reading delay file");
+        return -1;
+    }
+
+    return 0;
+}
+
+void receive_data(int n, siginfo_t* info, void* unused) {
+    printf("Signal handler received value %i.\n", info->si_int);
 }
 
 /* Timeout for signal processes. */

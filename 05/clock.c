@@ -145,8 +145,8 @@ static int __init mod_init(void) {
     /* sys filesystem */
     setup_timer(&timer, timer_callback, 0);
 
-    kobj_delay = kobject_create_and_add("lab5", kernel_kobj);
-    kobj_myclock2 = kobject_create_and_add("lab5", kernel_kobj);
+    kobj_delay = kobject_create_and_add("delay", kernel_kobj);
+    kobj_myclock2 = kobject_create_and_add("myclock2", kernel_kobj);
 
     if(!kobj_delay) {
         return -ENOMEM;
