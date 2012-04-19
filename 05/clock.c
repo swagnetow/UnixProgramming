@@ -15,7 +15,6 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("jpv");
 
 #define FILE "myclock"
-#define SIG_TEST 44
 
 struct siginfo info;
 static int delay;
@@ -27,18 +26,18 @@ void timer_callback(unsigned long data) {
 
     memset(&info, 0, sizeof(struct siginfo));
 
-    info.si_signo = SIG_TEST;
+    info.si_signo = SIGUSR1;
     info.si_code = SI_QUEUE;
     info.si_int = delay;
-    return_value = send_sig_info(SIG_TEST, &info, t);
+    return_value = send_sig_info(SIGUSR1, &info, t);
 
     if(return_value < 0) {
-        printk("kobject error sending signal\n");
+        printk(KERN_ALERT "kobject error sending signal\n");
     }
 }
 
 static ssize_t myclock2_show(struct kobject* kobj, struct kobj_attribute* attr, char* buffer) {
-    printk("myclock2 (myclock2_show): pid = %d", current->pid);
+    printk(KERN_ALERT "myclock2 (myclock2_show): pid = %d", current->pid);
 
     t = current;
 
@@ -46,7 +45,7 @@ static ssize_t myclock2_show(struct kobject* kobj, struct kobj_attribute* attr, 
 }
 
 static ssize_t myclock2_store(struct kobject *kobj, struct kobj_attribute *attr, const char* buffer, size_t count) {
-    printk("myclock2 (myclock2_store): pid = %d.\n", current->pid);
+    printk(KERN_ALERT "myclock2 (myclock2_store): pid = %d.\n", current->pid);
 
     return count;
 }
@@ -54,16 +53,16 @@ static ssize_t myclock2_store(struct kobject *kobj, struct kobj_attribute *attr,
 static ssize_t delay_show(struct kobject* kobj, struct kobj_attribute* attr, char* buffer) {
     int return_value;
 
-    printk("delay (delay_show): pid = %d, delay = %d.\n", current->pid, delay);
+    printk(KERN_ALERT "delay (delay_show): pid = %d, delay = %d.\n", current->pid, delay);
 
     t = current;
 
-    printk("delay (delay_show): Starting timer to fire in %d seconds.\n", delay);
+    printk(KERN_ALERT "delay (delay_show): Starting timer to fire in %d seconds.\n", delay);
 
     return_value = mod_timer(&timer, jiffies + msecs_to_jiffies(delay * 1000));
 
     if(return_value) {
-        printk("delay (delay_show): Error in setting timer!\n");
+        printk(KERN_ALERT "delay (delay_show): Error in setting timer!\n");
     }
 
     return sprintf(buffer, "%d\n", delay);
@@ -72,7 +71,7 @@ static ssize_t delay_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 static ssize_t delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char* buffer, size_t count) {
     sscanf(buffer, "%du", &delay);
 
-    printk("delay (delay_store): pid = %d, delay = %d.\n", current->pid, delay);
+    printk(KERN_ALERT "delay (delay_store): pid = %d, delay = %d.\n", current->pid, delay);
 
     return count;
 }
@@ -81,7 +80,7 @@ static struct kobj_attribute delay_attribute = __ATTR(delay, 0666, delay_show, d
 
 static struct kobj_attribute myclock2_attribute = __ATTR(myclock2, 0666, myclock2_show, myclock2_store);
 
-/* Returns a single ASCII string with two numerical substrings seperated by a delayngle space correseponding
+/* Returns a single ASCII string with two numerical substrings seperated by a single space correseponding
  * to the number of seconds in the current epoch and the number of microseconds in the current second.
  */
 int mod_file_reader(char* buffer, char** buffer_location, off_t offset, int length, int* eof, void* data) {
@@ -123,7 +122,7 @@ static int __init mod_init(void) {
     int myclock2_value;
     struct proc_dir_entry *file;
 
-    /* proc filesystem */
+    /* procfs */
     printk(KERN_ALERT "Creating a /proc/myclock file.\n");
 
     file = create_proc_entry(FILE, 0644, NULL);
@@ -142,7 +141,7 @@ static int __init mod_init(void) {
 
     printk(KERN_ALERT "/proc/myclock has been created!\n");
 
-    /* sys filesystem */
+    /* sysfs */
     setup_timer(&timer, timer_callback, 0);
 
     kobj_delay = kobject_create_and_add("delay", kernel_kobj);
@@ -163,9 +162,13 @@ static int __init mod_init(void) {
         kobject_put(kobj_delay);
     }
 
+    printk(KERN_ALERT "/sys/kernel/delay/delay has been created!\n");
+
     if(myclock2_value) {
         kobject_put(kobj_myclock2);
     }
+
+    printk(KERN_ALERT "/sys/kernel/myclock2/myclock2 has been created!\n");
 
     return 0;
 }
@@ -186,8 +189,8 @@ static void __exit mod_exit(void) {
 
     printk("myclock2: Uninstalling!\n");
 
-    kobject_put(kobj_myclock2);
-    kobject_put(kobj_delay);
+    kobject_del(kobj_myclock2);
+    kobject_del(kobj_delay);
 }
 
 module_init(mod_init);
