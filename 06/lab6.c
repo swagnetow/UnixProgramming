@@ -21,13 +21,15 @@ int main(int argc, char** argv) {
     int n;
     struct itimerval value;
     struct itimerval ovalue;
-    struct sigaction sig;
+    struct sigaction sig[5];
+    int signals[5] = { 40, 41, 42, 43, 44 };
 
-    sig.sa_sigaction = receive_data;
-    sig.sa_flags = SA_SIGINFO;
-    sigaction(SIGUSR1, &sig, NULL);
-
-    set_timeout_delay(atoi(argv[1]));
+    for(i = 0; i < 5; i++) {
+        sig[i].sa_sigaction = receive_data;
+        sig[i].sa_flags = SA_SIGINFO;
+        sigaction(signals[i], &sig[i], NULL);
+        set_timeout_delay(atoi(argv[i+1]));
+    }
 
     /* Executes every second for 5 minutes. */
     for(i = 1; i <= 300; i++) {
