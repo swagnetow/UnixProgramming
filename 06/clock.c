@@ -16,25 +16,23 @@ MODULE_AUTHOR("jpv");
 
 #define FILE "myclock"
 
-struct siginfo info[5];
+struct siginfo info;
 static int delay[5];
 static struct timer_list timer[5];
-static struct task_struct *t[5];
+static struct task_struct *t;
 static int signals[5] = { 40, 41, 42, 43, 44 };
 static int n = 0;
 
 void timer_callback(unsigned long data) {
-    int i;
     int return_value;
 
     memset(&info, 0, sizeof(struct siginfo));
 
-    for(i = 0; i < 5; i++) {
-        info[i].si_signo = signals[i];
-        info[i].si_code = SI_QUEUE;
-        info[i].si_int = delay[i];
-        return_value = send_sig_info(signals[i], &info[i], t[i]);
-    }
+    info.si_signo = signals[n];
+    info.si_code = SI_QUEUE;
+    info.si_int = delay[n];
+
+    return_value = send_sig_info(signals[n], &info, t);
 
     if(return_value < 0) {
         printk(KERN_ALERT "kobject error sending signal\n");
@@ -44,7 +42,7 @@ void timer_callback(unsigned long data) {
 static ssize_t myclock2_show(struct kobject* kobj, struct kobj_attribute* attr, char* buffer) {
     printk(KERN_ALERT "myclock2 (myclock2_show): pid = %d", current->pid);
 
-    t[n++] = current;
+    t = current;
 
     return sprintf(buffer, "%d %d", (int)CURRENT_TIME.tv_sec, (int)CURRENT_TIME.tv_nsec/1000);
 }
@@ -60,7 +58,7 @@ static ssize_t delay_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 
     printk(KERN_ALERT "delay (delay_show): pid = %d, delay = %d.\n", current->pid, delay[n]);
 
-    t[n] = current;
+    t = current;
 
     printk(KERN_ALERT "delay (delay_show): Starting timer to fire in %d seconds.\n", delay[n]);
 
@@ -76,7 +74,7 @@ static ssize_t delay_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 static ssize_t delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char* buffer, size_t count) {
     sscanf(buffer, "%du", &delay[n]);
 
-    printk(KERN_ALERT "delay (delay_store): pid = %d, delay = %d, n = %d.\n", current->pid, delay[n], n);
+    printk(KERN_ALERT "delay (delay_store): pid = %d, delay = %d.\n", current->pid, delay[n]);
 
     return count;
 }

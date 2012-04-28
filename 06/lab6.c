@@ -15,6 +15,7 @@ void timeout();
 
 /* Global variable to set the timeout. */
 int done;
+int signals[5] = { 40, 41, 42, 43, 44 };
 
 int main(int argc, char** argv) {
     int i;
@@ -22,7 +23,6 @@ int main(int argc, char** argv) {
     struct itimerval value;
     struct itimerval ovalue;
     struct sigaction sig[5];
-    int signals[5] = { 40, 41, 42, 43, 44 };
 
     for(i = 0; i < 5; i++) {
         sig[i].sa_sigaction = receive_data;
