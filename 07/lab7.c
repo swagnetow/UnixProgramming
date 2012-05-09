@@ -23,10 +23,11 @@ int main(int argc, char** argv) {
     struct itimerval ovalue;
     struct sigaction sig;
 
-    for(i = 0; i < 5; i++) {
+    for(i = 0; i < argc-1; i++) {
         sig.sa_sigaction = receive_data;
         sig.sa_flags = SA_SIGINFO;
         sigaction(SIGUSR1, &sig, NULL);
+        printf("I AM ERROR!\n");
         set_timeout_delay(atoi(argv[i+1]));
     }
 
@@ -184,7 +185,7 @@ int set_timeout_delay(int delay) {
 }
 
 void receive_data(int n, siginfo_t* info, void* unused) {
-    printf("Alarm going off at %i seconds!\n\n", info->si_int);
+    printf("Alarm going off at %d seconds!\n\n", info->si_int);
 }
 
 /* Timeout for signal processes. */

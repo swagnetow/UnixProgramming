@@ -17,31 +17,34 @@ MODULE_AUTHOR("jpv");
 
 #define FILE "myclock2"
 
-/* Lab 6 stuff */
-static int delay[5];
-static struct timer_list timer[5];
-static int n;
-
 struct proc_dir_entry *file;
 struct siginfo info;
 static struct task_struct *t;
 static struct kmem_cache *pending_alarm_cache;
+static struct pending_alarm *current_alarm;
 
 struct pending_alarm {
-    int signal;
+    int delay;
     struct list_head alarm_list;
+    struct timer_list timer;
 };
 
 LIST_HEAD(my_alarm_list);
 
 void timer_callback(unsigned long data) {
-    int element = -1;
-    int i;
     int return_value;
+    int this_delay;
+    struct list_head *pos;
+    struct pending_alarm *alarm;
 
-    for(i = 0; i < 5 && element == -1; i++) {
-        if(delay[i] == (int)data) {
-            element = i;
+    printk(KERN_ALERT "****** I AM ERROR!\n");
+
+    list_for_each(pos, &my_alarm_list) {
+        alarm = list_entry(pos, struct pending_alarm, alarm_list);
+
+        if(alarm->delay == (int)data) {
+            this_delay = alarm->delay;
+            printk(KERN_ALERT "delay (timer_callback): delay %d\n", this_delay);
         }
     }
 
@@ -49,15 +52,13 @@ void timer_callback(unsigned long data) {
 
     info.si_signo = SIGUSR1;
     info.si_code = SI_QUEUE;
-    info.si_int = delay[element];
+    info.si_int = this_delay;
     return_value = send_sig_info(SIGUSR1, &info, t);
 
     if(return_value < 0) {
-        printk(KERN_ALERT "kobject error sending signal\n");
+        printk(KERN_ALERT "kobject error sending delay\n");
     }
 
-    n++;
-    delay[element] = -1;
 }
 
 static ssize_t myclock2_show(struct kobject* kobj, struct kobj_attribute* attr, char* buffer) {
@@ -75,54 +76,33 @@ static ssize_t myclock2_store(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 static ssize_t delay_show(struct kobject* kobj, struct kobj_attribute* attr, char* buffer) {
-    int element;
     int return_value;
-    struct list_head *pos;
-    struct pending_alarm *alarm;
 
-    element = n++;
-
-    printk(KERN_ALERT "delay (delay_show): pid = %d, delay = %d.\n", current->pid, delay[element]);
+    printk(KERN_ALERT "delay (delay_show): pid = %d, delay = %d.\n", current->pid, current_alarm->delay);
 
     t = current;
 
-    printk(KERN_ALERT "delay (delay_show): Starting timer to fire in %d seconds.\n", delay[element]);
+    printk(KERN_ALERT "delay (delay_show): Starting timer to fire in %d seconds.\n", current_alarm->delay);
 
-    return_value = mod_timer(&timer[element], jiffies + msecs_to_jiffies(delay[element] * 1000));
-
-    list_for_each(pos, &my_alarm_list) {
-        alarm = list_entry(pos, struct pending_alarm, alarm_list);
-        printk("%d\n", alarm->signal);
-    }
+    return_value = mod_timer(&current_alarm->timer, jiffies + msecs_to_jiffies(current_alarm->delay * 1000));
 
     if(return_value) {
         printk(KERN_ALERT "delay (delay_show): Error in setting timer!\n");
     }
 
-    return sprintf(buffer, "%d\n", delay[element]);
+    return sprintf(buffer, "%d\n", current_alarm->delay);
 }
 
 static ssize_t delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char* buffer, size_t count) {
-    int element = -1;
-    int i;
-    struct pending_alarm *alarm;
-    alarm = kmem_cache_alloc(pending_alarm_cache, GFP_KERNEL);
+    current_alarm = kmem_cache_alloc(pending_alarm_cache, GFP_KERNEL);
 
-    for(i = 0; i < 5 && element == -1; i++) {
-        if(delay[i] == -1) {
-            element = i;
-        }
-    }
+    sscanf(buffer, "%d", &current_alarm->delay);
 
-    sscanf(buffer, "%d", &delay[element]);
+    list_add(&current_alarm->alarm_list, &my_alarm_list);
 
-    alarm->signal = delay[element];
+    setup_timer(&current_alarm->timer, timer_callback, current_alarm->delay);
 
-    list_add(&alarm->alarm_list, &my_alarm_list);
-
-    setup_timer(&timer[element], timer_callback, alarm->signal);
-
-    printk(KERN_ALERT "delay (delay_store): pid = %d, delay = %d.\n", current->pid, alarm->signal);
+    printk(KERN_ALERT "delay (delay_store): pid = %d, delay = %d.\n", current->pid, current_alarm->delay);
 
     return count;
 }
@@ -155,14 +135,8 @@ int mod_file_reader(char* buffer, char** buffer_location, off_t offset, int leng
 }
 
 static int __init mod_init(void) {
-    int i;
     int return_value;
-    n = 0;
     pending_alarm_cache = kmem_cache_create("pending_alarm", sizeof(struct pending_alarm), 0, SLAB_HWCACHE_ALIGN, NULL);
-
-    for(i = 0; i < 5; i++) {
-        delay[i] = -1;
-    }
 
     /* procfs */
     printk(KERN_ALERT "Creating a /proc/myclock2 file.\n");
@@ -203,20 +177,23 @@ static int __init mod_init(void) {
 }
 
 static void __exit mod_exit(void) {
-    int i;
     int return_value;
+    struct list_head *pos;
+    struct pending_alarm *alarm;
 
     /* proc filesystem */
     printk(KERN_ALERT "Goodbye!\n");
     remove_proc_entry(FILE, NULL);
 
     /* sys filesystem */
-    for(i = 0; i < 5; i++) {
-        return_value = del_timer(&timer[i]);
-    }
+    list_for_each(pos, &my_alarm_list) {
+        alarm = list_entry(pos, struct pending_alarm, alarm_list);
 
-    if(return_value) {
-        printk("myclock2: The timer is still in use!\n");
+        return_value = del_timer(&alarm->timer);
+
+        if(return_value) {
+            printk("myclock2: The timer is still in use!\n");
+        }
     }
 
     printk("myclock2: Uninstalling!\n");
