@@ -37,14 +37,12 @@ void timer_callback(unsigned long data) {
     struct list_head *pos;
     struct pending_alarm *alarm;
 
-    printk(KERN_ALERT "****** I AM ERROR!\n");
-
+    /* Iterate through the linked list to find the right alarm. */
     list_for_each(pos, &my_alarm_list) {
         alarm = list_entry(pos, struct pending_alarm, alarm_list);
 
         if(alarm->delay == (int)data) {
             this_delay = alarm->delay;
-            printk(KERN_ALERT "delay (timer_callback): delay %d\n", this_delay);
         }
     }
 
@@ -94,10 +92,12 @@ static ssize_t delay_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 }
 
 static ssize_t delay_store(struct kobject *kobj, struct kobj_attribute *attr, const char* buffer, size_t count) {
+    /* Allocate memory in kernel space for the alarm struct. */
     current_alarm = kmem_cache_alloc(pending_alarm_cache, GFP_KERNEL);
 
     sscanf(buffer, "%d", &current_alarm->delay);
 
+    /* Add a node with the current alarm information to the linked list. */
     list_add(&current_alarm->alarm_list, &my_alarm_list);
 
     setup_timer(&current_alarm->timer, timer_callback, current_alarm->delay);
